@@ -23,6 +23,17 @@
   become: yes
 
   tasks:
+    - name: Set system hostname and domain
+      ansible.builtin.hostname:
+        name: "{{ inventory_hostname_short }}.hh10.lan"
+
+    - name: Update /etc/hosts with new domain
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '^127\.0\.1\.1'
+        line: "127.0.1.1 {{ inventory_hostname_short }}.hh10.lan {{ inventory_hostname_short }}"
+        state: present
+        
     - name: Perform a dist-upgrade.
       ansible.builtin.apt:
         upgrade: dist
