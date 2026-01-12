@@ -23,6 +23,12 @@
   become: yes
 
   tasks:
+      - name: Ensure DNS search domain is set to hh10.lan
+        ansible.builtin.lineinfile:
+          path: /etc/resolv.conf
+          line: "search hh10.lan"
+          insertbefore: BOF
+          state: present
     # - name: Set system hostname and domain
     #   ansible.builtin.hostname:
     #     # ansible_hostname is the current name on the machine
