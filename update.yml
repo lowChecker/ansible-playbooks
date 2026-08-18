@@ -29,6 +29,60 @@
         line: "search hh10.lan"
         insertbefore: BOF
         state: present
+
+    - name: Clean APT cache and partial files first
+      ansible.builtin.command:
+        cmd: "{{ item }}"
+      loop:
+        - apt-get clean
+        - rm -rf /var/lib/apt/lists/partial /var/lib/apt/lists/*
+      changed_when: true
+      when: ansible_os_family == "Debian"
+
+    - name: Vacuum systemd journal older than 30 days
+      ansible.builtin.command: journalctl --vacuum-time=30d
+      register: journal_vacuum
+      changed_when: "'Vacuuming done' in journal_vacuum.stdout"
+      when: ansible_service_mgr == "systemd"
+
+    - name: Find rotated/compressed log files older than 30 days
+      ansible.builtin.find:
+        paths: /var/log
+        recurse: yes
+        age: 30d
+        patterns:
+          - '*.gz'
+          - '*.old'
+          - '*.[0-9]'
+      register: old_log_files
+
+    - name: Remove rotated/compressed log files older than 30 days
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_log_files.files }}"
+
+    - name: Find temp files older than 30 days
+      ansible.builtin.find:
+        paths:
+          - /tmp
+          - /var/tmp
+        age: 30d
+        recurse: yes
+        file_type: file
+      register: old_tmp_files
+
+    - name: Remove temp files older than 30 days
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_tmp_files.files }}"
+      ignore_errors: yes
+
+    - name: Docker system prune all unused objects
+      ansible.builtin.command: docker system prune -a --volumes -f
+      ignore_errors: yes
+
     # - name: Set system hostname and domain
     #   ansible.builtin.hostname:
     #     # ansible_hostname is the current name on the machine
@@ -59,3 +113,4 @@
     - name: Remove dependencies that are no longer required.
       ansible.builtin.apt:
         autoremove: yes
+        autoclean: yes
