@@ -79,9 +79,15 @@
       loop: "{{ old_tmp_files.files }}"
       ignore_errors: yes
 
-    - name: Docker system prune all unused objects
-      ansible.builtin.command: docker system prune -a --volumes -f
-      ignore_errors: yes
+    # Only unused IMAGES older than 30 days. Never `docker system prune` / `container prune`: that deletes
+    # every STOPPED container, including stacks that did not restart after the reboot below
+    # (2026-11-16 Prometheus on docker-loki was lost that way, see wiki Incident-2026-11-16-Prometheus-container-lost).
+    # Images still referenced by any container (running or stopped) are kept; volumes are never touched.
+    - name: Docker prune unused images older than 30 days (containers and volumes are kept)
+      ansible.builtin.command: docker image prune -a -f --filter "until=720h"
+      register: docker_image_prune
+      changed_when: "'Total reclaimed space: 0B' not in docker_image_prune.stdout"
+      failed_when: false
 
     # - name: Set system hostname and domain
     #   ansible.builtin.hostname:
